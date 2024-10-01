@@ -3,7 +3,7 @@ button_card_templates:
     variables:
       assist_group: group.viewassist_satellites
       var_weather_entity: weather.forecast_home
-      use_24_hour_time: false
+      use_24_hour_time: true
       default_satellite: |-
         [[[
           return hass.states[variables.assist_group].attributes.entity_id
@@ -226,9 +226,9 @@ button_card_templates:
           styles:
             grid:
               - grid-template-areas: |
-                  "mediaplayer mic hold dnd"
+                  "mediaplayer mic mode dnd"
               - grid-template-rows: min-content
-              - grid-template-columns: 1fr 1fr 1fr 1fr
+              - grid-template-columns: .8fr .8fr .8fr .8fr
             card:
               - background-color: transparent
               - border-width: 0px
@@ -240,23 +240,13 @@ button_card_templates:
                     "block"; else return "none"; ]]]
               mic:
                 - position: relative
-                - display: >-
-                    [[[ if (variables.var_mic_mute === "off") return "block";
-                    else return "none"; ]]]
-              hold:
+                - display: block
+              mode:
                 - position: relative
-                - display: >-
-                    [[[ if
-                    (hass.states[variables.var_assistsat_entity].attributes.mode
-                    === "hold") return "block"; else return "none";
-                    ]]]                
+                - display: block
               dnd:
                 - position: relative
-                - display: >-
-                    [[[ if
-                    (hass.states[variables.var_assistsat_entity].attributes.do_not_disturb
-                    === true) return "block"; else return "none";
-                    ]]]                                
+                - display: block
           custom_fields:
             mediaplayer:
               card:
@@ -280,7 +270,13 @@ button_card_templates:
             mic:
               card:
                 type: custom:button-card
-                icon: mdi:microphone-off
+                icon: |-
+                  [[[ 
+                    if (hass.states[variables.var_mic_device].state === "off")
+                      return "mdi:microphone-off";
+
+                    return "mdi:microphone";
+                  ]]]
                 show_name: false
                 color_type: card
                 styles:
@@ -290,15 +286,32 @@ button_card_templates:
                   icon:
                     - color: white
                     - height: 90%
+                    - opacity: |-
+                        [[[ 
+                          if (hass.states[variables.var_mic_device].state === "off")
+                            return "1";
+
+                          return "0.5";
+                        ]]]
                 tap_action:
                   action: call-service
-                  service: homeassistant.turn_on
+                  service: homeassistant.toggle
                   service_data:
                     entity_id: '[[[ return variables.var_mic_device ]]]'
-            hold:
+            mode:
               card:
                 type: custom:button-card
-                icon: mdi:hand-back-left
+                icon: |-
+                  [[[ 
+                    if (hass.states[variables.var_assistsat_entity].attributes.mode === "cycle")
+                      return "mdi:sync-circle";
+                    if (hass.states[variables.var_assistsat_entity].attributes.mode === "hold")
+                      return "mdi:pause";
+                    if (hass.states[variables.var_assistsat_entity].attributes.mode === "night")
+                      return "mdi:weather-night";
+
+                    return "mdi:home";
+                  ]]]
                 show_name: false
                 color_type: card
                 styles:
@@ -308,11 +321,41 @@ button_card_templates:
                   icon:
                     - color: white
                     - height: 90%
+                    - opacity: |-
+                        [[[ 
+                          if (hass.states[variables.var_assistsat_entity].attributes.mode === "cycle")
+                            return "0.5";
+                          if (hass.states[variables.var_assistsat_entity].attributes.mode === "normal")
+                            return "0.5";
+
+                          return "1";
+                        ]]]
                 tap_action:
                   action: call-service
                   service: python_script.set_state
                   service_data:
+                    mode: |-
+                      [[[ 
+                        if (hass.states[variables.var_assistsat_entity].attributes.mode === "cycle")
+                          return "hold";
+                        if (hass.states[variables.var_assistsat_entity].attributes.mode === "hold")
+                          return "cycle";
+                        if (hass.states[variables.var_assistsat_entity].attributes.mode === "night")
+                          return "normal";
+                        return "cycle";
+                      ]]]
+                    entity_id: '[[[ return variables.var_assistsat_entity ]]]'
+                hold_action:
+                  action: call-service
+                  service: python_script.set_state
+                  service_data:
                     mode: normal
+                    entity_id: '[[[ return variables.var_assistsat_entity ]]]'
+                double_tap_action:
+                  action: call-service
+                  service: python_script.set_state
+                  service_data:
+                    mode: night
                     entity_id: '[[[ return variables.var_assistsat_entity ]]]'
             dnd:
               card:
@@ -324,6 +367,13 @@ button_card_templates:
                   card:
                     - background-color: transparent
                     - border-width: 0px
+                    - opacity: |-
+                        [[[ 
+                          if (hass.states[variables.var_assistsat_entity].attributes.do_not_disturb === true)
+                            return "1";
+
+                          return "0.5";
+                        ]]]
                   icon:
                     - color: white
                     - height: 90%
@@ -331,7 +381,8 @@ button_card_templates:
                   action: call-service
                   service: python_script.set_state
                   service_data:
-                    do_not_disturb: false
+                    do_not_disturb: >-
+                      [[[ return
+                        !hass.states[variables.var_assistsat_entity].attributes.do_not_disturb
+                      ]]]
                     entity_id: '[[[ return variables.var_assistsat_entity ]]]'
-views:
-  - title: Home
